@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Series</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <style>
+        body {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            font-family: Arial, sans-serif;
+            background-color: #111;
+            color: #f0f0f0;
+        }
+        h1 {
+            margin-top: 20px;
+            color: #ffcc00;
+        }
+        .file-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            width: 80%;
+            max-width: 800px;
+            margin-top: 20px;
+            border: 1px solid #444;
+            border-radius: 8px;
+            background-color: #222;
+            padding: 10px;
+        }
+        .file {
+            display: flex;
+            align-items: center;
+            width: 100%;
+            margin: 10px 0;
+            padding: 10px;
+            background-color: #333;
+            border-radius: 8px;
+            transition: background-color 0.3s;
+            cursor: pointer;
+        }
+        .file i {
+            font-size: 24px;
+            margin-right: 15px;
+        }
+        .file .text {
+            font-size: 18px;
+            flex: 1;
+        }
+        .active {
+            background-color: #28a745;
+        }
+        .xbox-icon {
+            background: url('https://xbox.com/favicon.ico') no-repeat center center / contain;
+            width: 24px;
+            height: 24px;
+            display: inline-block;
+            margin-right: 15px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Gaming</h1>
+    <div class="file-container">
+        <div class="file" data-link="https://xbox.com/play">
+            <span class="xbox-icon"></span>
+            <div class="text">Xbox Cloud Gaming</div>
+        </div>
+    </div>
+
+    <script>
+        let files = document.querySelectorAll('.file');
+        let activeIndex = 0;
+        let lastButtonPress = 0;
+
+        function highlightFile(index) {
+            files.forEach((file, i) => {
+                file.classList.toggle('active', i === index);
+            });
+        }
+
+        function navigateToPage(index) {
+            let link = files[index].getAttribute('data-link');
+            window.location.href = link;
+        }
+
+        function handleGamepadInput() {
+            let gamepads = navigator.getGamepads();
+            if (!gamepads[0]) return;
+
+            let gp = gamepads[0];
+
+            if (gp.buttons[12].pressed && Date.now() - lastButtonPress > 200) { // up
+                activeIndex = (activeIndex - 1 + files.length) % files.length;
+                highlightFile(activeIndex);
+                lastButtonPress = Date.now();
+            }
+            if (gp.buttons[13].pressed && Date.now() - lastButtonPress > 200) { // down
+                activeIndex = (activeIndex + 1) % files.length;
+                highlightFile(activeIndex);
+                lastButtonPress = Date.now();
+            }
+            if (gp.buttons[0].pressed && Date.now() - lastButtonPress > 200) { // A button
+                navigateToPage(activeIndex);
+                lastButtonPress = Date.now();
+            }
+        }
+
+        window.addEventListener('gamepadconnected', function() {
+            console.log('Gamepad connected!');
+            setInterval(handleGamepadInput, 100);
+        });
+
+        window.addEventListener('gamepaddisconnected', function() {
+            console.log('Gamepad disconnected!');
+        });
+
+        highlightFile(activeIndex);
+    </script>
+</body>
+</html>

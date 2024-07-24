@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Controller Test Website</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <style>
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            font-family: Arial, sans-serif;
+            background-color: #f0f0f0;
+        }
+        .button-container {
+            display: flex;
+        }
+        .button {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            width: 200px;
+            height: 250px;
+            margin: 20px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            text-align: center;
+            cursor: pointer;
+            padding: 20px;
+            border-radius: 8px;
+            transition: background-color 0.3s;
+        }
+        .button i {
+            font-size: 100px;
+            margin-bottom: 15px;
+        }
+        .button .text {
+            font-size: 20px;
+        }
+        .active {
+            background-color: #28a745;
+        }
+    </style>
+</head>
+<body>
+    <div class="button-container">
+        <div class="button">
+            <i class="fas fa-film"></i>
+            <div class="text">Films</div>
+        </div>
+        <div class="button">
+            <i class="fas fa-tv"></i>
+            <div class="text">Series</div>
+        </div>
+        <div class="button">
+            <i class="fab fa-xbox"></i>
+            <div class="text">Gaming</div>
+        </div>
+    </div>
+
+    <script>
+        let buttons = document.querySelectorAll('.button');
+        let activeIndex = 0;
+        let lastButtonPress = 0;
+
+        function highlightButton(index) {
+            buttons.forEach((button, i) => {
+                button.classList.toggle('active', i === index);
+            });
+        }
+
+        function navigateToPage(index) {
+            let pages = ['films.html', 'series.html', 'gaming.html'];
+            window.location.href = pages[index];
+        }
+
+        function handleGamepadInput() {
+            let gamepads = navigator.getGamepads();
+            if (!gamepads[0]) return;
+
+            let gp = gamepads[0];
+
+            // Log the state of the gamepad buttons
+            console.log(gp.buttons.map((button, index) => `Button ${index}: ${button.pressed}`).join(', '));
+
+            // Using the d-pad (buttons 14 and 15) for left and right navigation
+            if (gp.buttons[14].pressed && Date.now() - lastButtonPress > 200) { // left
+                activeIndex = (activeIndex - 1 + buttons.length) % buttons.length;
+                highlightButton(activeIndex);
+                lastButtonPress = Date.now();
+            }
+            if (gp.buttons[15].pressed && Date.now() - lastButtonPress > 200) { // right
+                activeIndex = (activeIndex + 1) % buttons.length;
+                highlightButton(activeIndex);
+                lastButtonPress = Date.now();
+            }
+            if (gp.buttons[0].pressed && Date.now() - lastButtonPress > 200) { // A button
+                navigateToPage(activeIndex);
+                lastButtonPress = Date.now();
+            }
+        }
+
+        window.addEventListener('gamepadconnected', function() {
+            console.log('Gamepad connected!');
+            setInterval(handleGamepadInput, 100);
+        });
+
+        window.addEventListener('gamepaddisconnected', function() {
+            console.log('Gamepad disconnected!');
+        });
+
+        highlightButton(activeIndex);
+    </script>
+</body>
+</html>
