@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>5-bit Audio Binary Messenger</title>
+<style>
+body { font-family: sans-serif; padding: 20px; }
+button { margin: 5px; padding: 10px; }
+textarea { width: 100%; height: 80px; }
+</style>
+</head>
+<body>
+
+<h2>5-bit Audio Messenger</h2>
+
+<textarea id="text" placeholder="TYPE TEXT (A-Z and space only)"></textarea>
+<br>
+<button onclick="send()">SEND</button>
+<button onclick="listen()">LISTEN</button>
+
+<h3>Received:</h3>
+<div id="output"></div>
+
+<script>
+const BIT_TIME = 200; // ms
+const FREQ = 1500;
+const START_TIME = 1500;
+
+const AudioCtx = window.AudioContext || window.webkitAudioContext;
+const ctx = new AudioCtx();
+
+// ---------- TEXT → 5-BIT ----------
+function textToBits(text) {
+  text = text.toUpperCase();
+  let bits = [];
+  for (let c of text) {
+    let val = (c === ' ') ? 27 : c.charCodeAt(0) - 64;
+    if (val < 1 || val > 27) continue;
+    let bin = val.toString(2).padStart(5, '0');
+    bits.push(...bin);
+  }
+  return bits;
+}
+
+// ---------- SEND ----------
+async function send() {
+  await ctx.resume();
+  const bits = textToBits(document.getElementById("text").value);
+  const osc = ctx.createOscillator();
+  osc.frequency.value = FREQ;
+  osc.connect(ctx.destination);
+  osc.start();
+
+  let t = ctx.currentTime;
+
+  // START BEEP
+  osc.gain = ctx.createGain();
+  osc.connect(osc.gain);
+  osc.gain.connect(ctx.destination);
+  osc.gain.gain.setValueAtTime(1, t);
+  t += START_TIME / 1000;
+
+  for (let b of bits) {
+    osc.gain.gain.setValueAtTime(b === '1' ? 1 : 0, t);
+    t += BIT_TIME / 1000;
+  }
+
+  // END
+  osc.gain.gain.setValueAtTime(0, t);
+  osc.stop(t + 0.5);
+}
+
+// ---------- RECEIVE ----------
+async function listen() {
+  const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+  const mic = ctx.createMediaStreamSource(stream);
+  const analyser = ctx.createAnalyser();
+  analyser.fftSize = 256;
+  mic.connect(analyser);
+
+  let data = new Uint8Array(analyser.fftSize);
+  let bits = [];
+  let recording = false;
+  let lastSwitch = Date.now();
+
+  setInterval(() => {
+    analyser.getByteTimeDomainData(data);
+    let volume = data.reduce((a,b)=>a+Math.abs(b-128),0)/data.length;
+
+    let now = Date.now();
+    let state = volume > 15 ? 1 : 0;
+
+    if (!recording && state === 1) {
+      recording = true;
+      bits = [];
+      lastSwitch = now;
+      return;
+    }
+
+    if (recording && now - lastSwitch > BIT_TIME) {
+      bits.push(state);
+      lastSwitch = now;
+    }
+
+    if (recording && bits.length >= 5 && bits.slice(-5).every(b=>b===0)) {
+      decode(bits);
+      recording = false;
+    }
+  }, 50);
+}
+
+// ---------- DECODE ----------
+function decode(bits) {
+  let out = "";
+  for (let i = 0; i + 5 <= bits.length; i += 5) {
+    let val = parseInt(bits.slice(i,i+5).join(""), 2);
+    if (val === 27) out += " ";
+    else if (val >= 1 && val <= 26) out += String.fromCharCode(val + 64);
+  }
+  document.getElementById("output").innerText += out;
+}
+</script>
+
+</body>
+</html>
