@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Audio Text Transmitter</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 500px;
+            margin: 20px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .mode-selector {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        button {
+            padding: 12px 24px;
+            font-size: 16px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            background: #007bff;
+            color: white;
+        }
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        button.active {
+            background: #0056b3;
+        }
+        .panel {
+            display: none;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .panel.active {
+            display: block;
+        }
+        textarea {
+            width: 100%;
+            height: 100px;
+            font-size: 16px;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        .status {
+            margin-top: 15px;
+            padding: 10px;
+            background: #e9ecef;
+            border-radius: 4px;
+            min-height: 50px;
+        }
+        .binary-display {
+            font-family: monospace;
+            font-size: 12px;
+            word-break: break-all;
+            margin-top: 10px;
+            color: #666;
+        }
+        h2 {
+            margin-top: 0;
+        }
+        .info {
+            font-size: 14px;
+            color: #666;
+            margin-bottom: 15px;
+        }
+    </style>
+</head>
+<body>
+    <!-- Mode Selection -->
+    <div class="mode-selector">
+        <button id="transmitBtn" onclick="setMode('transmit')">Transmit</button>
+        <button id="receiveBtn" onclick="setMode('receive')">Receive</button>
+    </div>
+
+    <!-- Transmit Panel -->
+    <div id="transmitPanel" class="panel">
+        <h2>Transmit Text</h2>
+        <div class="info">Type text (A-Z and spaces only). Max volume recommended.</div>
+        <textarea id="textInput" placeholder="Enter text here..." maxlength="100"></textarea>
+        <button onclick="transmit()" style="margin-top: 10px; width: 100%;">Send Audio</button>
+        <div class="status" id="transmitStatus">Ready to transmit</div>
+        <div class="binary-display" id="binaryDisplay"></div>
+    </div>
+
+    <!-- Receive Panel -->
+    <div id="receivePanel" class="panel">
+        <h2>Receive Text</h2>
+        <div class="info">Grant microphone access. Hold phone near speaker.</div>
+        <button onclick="startReceiving()" style="width: 100%;">Start Listening</button>
+        <button onclick="stopReceiving()" style="width: 100%; margin-top: 10px; background: #dc3545;">Stop</button>
+        <div class="status" id="receiveStatus">Ready to receive</div>
+        <textarea id="receivedText" placeholder="Received text will appear here..." readonly></textarea>
+        <div class="binary-display" id="receivedBinary"></div>
+    </div>
+
+    <script>
+        // Audio context and variables
+        let audioContext;
+        let isReceiving = false;
+        let mediaStream;
+        let audioData = [];
+        let startTime;
+
+        // Constants
+        const BEEP_FREQ = 1000; // 1000 Hz tone
+        const BIT_DURATION = 500; // 500ms per bit
+        const START_DURATION = 2000; // 2 second start signal
+        const SAMPLE_RATE = 44100;
+
+        // Initialize
+        function setMode(mode) {
+            document.getElementById('transmitPanel').classList.remove('active');
+            document.getElementById('receivePanel').classList.remove('active');
+            document.getElementById('transmitBtn').classList.remove('active');
+            document.getElementById('receiveBtn').classList.remove('active');
+            
+            if (mode === 'transmit') {
+                document.getElementById('transmitPanel').classList.add('active');
+                document.getElementById('transmitBtn').classList.add('active');
+            } else {
+                document.getElementById('receivePanel').classList.add('active');
+                document.getElementById('receiveBtn').classList.add('active');
+            }
+        }
+
+        // Set initial mode
+        setMode('transmit');
+
+        // Text to 5-bit binary encoding
+        function textToBinary(text) {
+            text = text.toUpperCase();
+            let binary = '';
+            
+            for (let char of text) {
+                let code;
+                if (char >= 'A' && char <= 'Z') {
+                    code = char.charCodeAt(0) - 64; // A=1, B=2, ..., Z=26
+                } else if (char === ' ') {
+                    code = 27;
+                } else {
+                    continue; // Skip invalid characters
+                }
+                
+                // Convert to 5-bit binary
+                binary += code.toString(2).padStart(5, '0');
+            }
+            
+            return binary;
+        }
+
+        // Binary to text decoding
+        function binaryToText(binary) {
+            let text = '';
+            
+            // Process in 5-bit chunks
+            for (let i = 0; i < binary.length; i += 5) {
+                let chunk = binary.substr(i, 5);
+                if (chunk.length < 5) break;
+                
+                let code = parseInt(chunk, 2);
+                if (code >= 1 && code <= 26) {
+                    text += String.fromCharCode(code + 64); // 1=A, 2=B, ..., 26=Z
+                } else if (code === 27) {
+                    text += ' ';
+                }
+            }
+            
+            return text;
+        }
+
+        // Generate beep tone
+        function generateBeep(duration) {
+            if (!audioContext) {
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            }
+
+            const oscillator = audioContext.createOscillator();
+            const gainNode = audioContext.createGain();
+            
+            oscillator.connect(gainNode);
+            gainNode.connect(audioContext.destination);
+            
+            oscillator.frequency.value = BEEP_FREQ;
+            oscillator.type = 'sine';
+            
+            gainNode.gain.setValueAtTime(0.5, audioContext.currentTime);
+            
+            const startAt = audioContext.currentTime;
+            oscillator.start(startAt);
+            oscillator.stop(startAt + duration / 1000);
+            
+            return new Promise(resolve => {
+                setTimeout(resolve, duration);
+            });
+        }
+
+        // Transmit text as audio
+        async function transmit() {
+            const text = document.getElementById('textInput').value;
+            if (!text) {
+                alert('Please enter some text');
+                return;
+            }
+
+            const binary = textToBinary(text);
+            if (!binary) {
+                alert('No valid characters to transmit');
+                return;
+            }
+
+            document.getElementById('binaryDisplay').textContent = 'Binary: ' + binary;
+            document.getElementById('transmitStatus').textContent = 'Transmitting...';
+
+            try {
+                // Start signal (2 second beep)
+                await generateBeep(START_DURATION);
+                await new Promise(resolve => setTimeout(resolve, 200)); // Small gap
+
+                // Transmit each bit
+                for (let i = 0; i < binary.length; i++) {
+                    if (binary[i] === '1') {
+                        await generateBeep(BIT_DURATION);
+                    } else {
+                        // Silence
+                        await new Promise(resolve => setTimeout(resolve, BIT_DURATION));
+                    }
+                }
+
+                document.getElementById('transmitStatus').textContent = 
+                    `Transmission complete! Sent ${binary.length} bits (${text.length} characters)`;
+            } catch (error) {
+                document.getElementById('transmitStatus').textContent = 'Error: ' + error.message;
+            }
+        }
+
+        // Start receiving audio
+        async function startReceiving() {
+            if (isReceiving) return;
+
+            try {
+                // Request microphone access
+                mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                const source = audioContext.createMediaStreamSource(mediaStream);
+                const analyser = audioContext.createAnalyser();
+                analyser.fftSize = 2048;
+                source.connect(analyser);
+
+                const bufferLength = analyser.fftSize;
+                const dataArray = new Uint8Array(bufferLength);
+
+                isReceiving = true;
+                audioData = [];
+                startTime = Date.now();
+
+                document.getElementById('receiveStatus').textContent = 'Listening... waiting for start signal';
+
+                // Sample audio at regular intervals
+                const sampleInterval = setInterval(() => {
+                    if (!isReceiving) {
+                        clearInterval(sampleInterval);
+                        return;
+                    }
+
+                    analyser.getByteTimeDomainData(dataArray);
+                    
+                    // Calculate volume (RMS)
+                    let sum = 0;
+                    for (let i = 0; i < bufferLength; i++) {
+                        const normalized = (dataArray[i] - 128) / 128;
+                        sum += normalized * normalized;
+                    }
+                    const rms = Math.sqrt(sum / bufferLength);
+                    
+                    audioData.push({
+                        time: Date.now() - startTime,
+                        volume: rms
+                    });
+                }, 20); // Sample every 20ms
+
+            } catch (error) {
+                document.getElementById('receiveStatus').textContent = 'Error: ' + error.message;
+                alert('Could not access microphone: ' + error.message);
+            }
+        }
+
+        // Stop receiving and decode
+        function stopReceiving() {
+            if (!isReceiving) return;
+
+            isReceiving = false;
+            
+            if (mediaStream) {
+                mediaStream.getTracks().forEach(track => track.stop());
+            }
+
+            document.getElementById('receiveStatus').textContent = 'Processing...';
+
+            // Decode the audio data
+            try {
+                const binary = decodeAudio(audioData);
+                const text = binaryToText(binary);
+                
+                document.getElementById('receivedText').value = text;
+                document.getElementById('receivedBinary').textContent = 'Binary: ' + binary;
+                document.getElementById('receiveStatus').textContent = 
+                    `Received ${binary.length} bits → "${text}"`;
+            } catch (error) {
+                document.getElementById('receiveStatus').textContent = 'Decode error: ' + error.message;
+            }
+        }
+
+        // Decode audio data to binary
+        function decodeAudio(data) {
+            if (data.length === 0) {
+                throw new Error('No audio data recorded');
+            }
+
+            // Calculate average volume to set threshold
+            const volumes = data.map(d => d.volume);
+            const avgVolume = volumes.reduce((a, b) => a + b, 0) / volumes.length;
+            const maxVolume = Math.max(...volumes);
+            const threshold = avgVolume + (maxVolume - avgVolume) * 0.3;
+
+            // Find start signal (long beep ~2 seconds)
+            let startIndex = -1;
+            let beepStart = -1;
+            
+            for (let i = 0; i < data.length; i++) {
+                if (data[i].volume > threshold) {
+                    if (beepStart === -1) {
+                        beepStart = i;
+                    }
+                } else {
+                    if (beepStart !== -1) {
+                        const beepDuration = data[i].time - data[beepStart].time;
+                        if (beepDuration >= START_DURATION * 0.8) { // Allow 20% tolerance
+                            startIndex = i;
+                            break;
+                        }
+                        beepStart = -1;
+                    }
+                }
+            }
+
+            if (startIndex === -1) {
+                throw new Error('Start signal not detected');
+            }
+
+            // Decode bits after start signal
+            let binary = '';
+            const startDataTime = data[startIndex].time;
+            const bitSamples = Math.floor(BIT_DURATION / 20); // Samples per bit period
+
+            // Group samples into bit periods
+            let currentBit = 0;
+            for (let i = startIndex; i < data.length; i++) {
+                const elapsedTime = data[i].time - startDataTime;
+                const bitNumber = Math.floor(elapsedTime / BIT_DURATION);
+                
+                if (bitNumber > currentBit) {
+                    currentBit = bitNumber;
+                }
+            }
+
+            // Decode each bit period
+            for (let bit = 0; bit < currentBit; bit++) {
+                const bitStartTime = startDataTime + (bit * BIT_DURATION);
+                const bitEndTime = bitStartTime + BIT_DURATION;
+                
+                // Get samples in this bit period
+                const bitSamples = data.filter(d => 
+                    d.time >= bitStartTime && d.time < bitEndTime
+                );
+                
+                if (bitSamples.length === 0) continue;
+                
+                // Average volume in this period
+                const avgBitVolume = bitSamples.reduce((sum, d) => sum + d.volume, 0) / bitSamples.length;
+                
+                // Is it a beep (1) or silence (0)?
+                binary += avgBitVolume > threshold ? '1' : '0';
+            }
+
+            return binary;
+        }
+    </script>
+</body>
+</html>
