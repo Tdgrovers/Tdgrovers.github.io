@@ -1,0 +1,272 @@
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: transparent; }
+  .mc-wrap {
+    background: linear-gradient(180deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+    border-radius: var(--border-radius-lg);
+    padding: 2.5rem 2rem 2rem;
+    font-family: var(--font-sans);
+    min-height: 100%;
+    position: relative;
+    overflow: hidden;
+  }
+  .stars {
+    position: absolute; top: 0; left: 0; right: 0; height: 200px;
+    background-image:
+      radial-gradient(1px 1px at 10% 15%, white 0%, transparent 100%),
+      radial-gradient(1px 1px at 30% 8%, white 0%, transparent 100%),
+      radial-gradient(1px 1px at 55% 20%, white 0%, transparent 100%),
+      radial-gradient(1px 1px at 75% 5%, white 0%, transparent 100%),
+      radial-gradient(1px 1px at 90% 18%, white 0%, transparent 100%),
+      radial-gradient(1px 1px at 20% 30%, rgba(255,255,255,0.6) 0%, transparent 100%),
+      radial-gradient(1px 1px at 65% 12%, rgba(255,255,255,0.6) 0%, transparent 100%);
+    pointer-events: none;
+  }
+  .mc-title {
+    font-family: 'Press Start 2P', monospace;
+    color: #55ff55;
+    font-size: 13px;
+    text-align: center;
+    line-height: 1.8;
+    margin-bottom: 0.5rem;
+    text-shadow: 2px 2px #1a6b1a;
+    position: relative;
+  }
+  .mc-subtitle {
+    font-family: 'Press Start 2P', monospace;
+    color: #ffff55;
+    font-size: 7px;
+    text-align: center;
+    margin-bottom: 2rem;
+    letter-spacing: 1px;
+    position: relative;
+  }
+  .mc-block {
+    background: rgba(0,0,0,0.45);
+    border: 2px solid #555;
+    border-radius: 4px;
+    padding: 1.25rem;
+    margin-bottom: 1rem;
+    position: relative;
+  }
+  .mc-label {
+    font-family: 'Press Start 2P', monospace;
+    font-size: 8px;
+    color: #aaa;
+    margin-bottom: 10px;
+    display: block;
+  }
+  .mc-input-row {
+    display: flex;
+    gap: 8px;
+  }
+  .mc-input {
+    flex: 1;
+    background: #000;
+    border: 2px solid #555;
+    color: #fff;
+    font-family: 'Press Start 2P', monospace;
+    font-size: 10px;
+    padding: 10px 12px;
+    border-radius: 2px;
+    outline: none;
+    transition: border-color 0.15s;
+  }
+  .mc-input:focus { border-color: #55ff55; }
+  .mc-input::placeholder { color: #444; }
+  .mc-btn {
+    background: #55ff55;
+    border: none;
+    color: #000;
+    font-family: 'Press Start 2P', monospace;
+    font-size: 8px;
+    padding: 10px 14px;
+    cursor: pointer;
+    border-radius: 2px;
+    transition: background 0.1s, transform 0.1s;
+    white-space: nowrap;
+  }
+  .mc-btn:hover { background: #88ff88; }
+  .mc-btn:active { transform: scale(0.96); background: #33cc33; }
+  .mc-btn:disabled { background: #333; color: #666; cursor: not-allowed; }
+  .status-msg {
+    font-family: 'Press Start 2P', monospace;
+    font-size: 7px;
+    margin-top: 8px;
+    min-height: 16px;
+    transition: color 0.2s;
+  }
+  .status-ok { color: #55ff55; }
+  .status-err { color: #ff5555; }
+  .status-loading { color: #ffff55; }
+  .suggestions-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 10px;
+  }
+  .suggestions-title {
+    font-family: 'Press Start 2P', monospace;
+    font-size: 8px;
+    color: #aaa;
+  }
+  .count-badge {
+    font-family: 'Press Start 2P', monospace;
+    font-size: 7px;
+    background: rgba(85,255,85,0.15);
+    color: #55ff55;
+    border: 1px solid #55ff55;
+    border-radius: 2px;
+    padding: 2px 6px;
+  }
+  .suggestions-list {
+    max-height: 220px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .suggestions-list::-webkit-scrollbar { width: 4px; }
+  .suggestions-list::-webkit-scrollbar-track { background: #111; }
+  .suggestions-list::-webkit-scrollbar-thumb { background: #555; border-radius: 2px; }
+  .suggestion-item {
+    background: rgba(255,255,255,0.04);
+    border: 1px solid #333;
+    border-left: 3px solid #55ff55;
+    border-radius: 2px;
+    padding: 8px 12px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    animation: fadeIn 0.3s ease;
+  }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
+  .suggestion-name {
+    font-family: 'Press Start 2P', monospace;
+    font-size: 9px;
+    color: #fff;
+  }
+  .suggestion-time {
+    font-size: 10px;
+    color: #555;
+    font-family: var(--font-sans);
+  }
+  .empty-state {
+    text-align: center;
+    padding: 2rem 1rem;
+  }
+  .empty-state p {
+    font-family: 'Press Start 2P', monospace;
+    font-size: 8px;
+    color: #444;
+    line-height: 2;
+  }
+  .grass-bar {
+    height: 8px;
+    background: repeating-linear-gradient(90deg, #4a7c3f 0px, #4a7c3f 16px, #5a9a4e 16px, #5a9a4e 32px);
+    border-radius: 2px;
+    margin-bottom: 1.5rem;
+    position: relative;
+  }
+</style>
+
+<div class="mc-wrap">
+  <div class="stars"></div>
+  <div class="mc-title">? ? ? ? ?</div>
+  <div class="mc-subtitle">er komt een nieuwe minecraft server...</div>
+  <div class="grass-bar"></div>
+
+  <div class="mc-block">
+    <span class="mc-label">geef een server naam</span>
+    <div class="mc-input-row">
+      <input class="mc-input" id="nameInput" type="text" placeholder="je idee hier..." maxlength="40" />
+      <button class="mc-btn" id="submitBtn" onclick="submitName()">insturen</button>
+    </div>
+    <div class="status-msg" id="statusMsg"></div>
+  </div>
+
+  <div class="mc-block">
+    <div class="suggestions-header">
+      <span class="suggestions-title">ingestuurde namen</span>
+      <span class="count-badge" id="countBadge">0</span>
+    </div>
+    <div class="suggestions-list" id="suggestionsList">
+      <div class="empty-state"><p>nog geen suggesties.<br/>ben de eerste!</p></div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+const SUPABASE_URL = 'https://vvltkzffkpwgdmsnsbal.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ2bHRremZma3B3Z2Rtc25zYmFsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY2ODg4NzgsImV4cCI6MjA5MjI2NDg3OH0.UgRDisRehAiD8h7GulnATPfdZqu3iAGhcuu5tvLINUs';
+
+const { createClient } = supabase;
+const db = createClient(SUPABASE_URL, SUPABASE_KEY);
+
+function timeAgo(ts) {
+  const diff = Math.floor((Date.now() - new Date(ts)) / 1000);
+  if (diff < 60) return diff + 's ago';
+  if (diff < 3600) return Math.floor(diff/60) + 'm ago';
+  if (diff < 86400) return Math.floor(diff/3600) + 'h ago';
+  return Math.floor(diff/86400) + 'd ago';
+}
+
+function renderList(items) {
+  const list = document.getElementById('suggestionsList');
+  document.getElementById('countBadge').textContent = items.length;
+  if (!items.length) {
+    list.innerHTML = '<div class="empty-state"><p>nog geen suggesties.<br/>ben de eerste!</p></div>';
+    return;
+  }
+  list.innerHTML = items.map(i => `
+    <div class="suggestion-item">
+      <span class="suggestion-name">${escHtml(i.name)}</span>
+      <span class="suggestion-time">${timeAgo(i.created_at)}</span>
+    </div>
+  `).join('');
+}
+
+function escHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function setStatus(msg, type) {
+  const el = document.getElementById('statusMsg');
+  el.textContent = msg;
+  el.className = 'status-msg status-' + type;
+}
+
+async function loadSuggestions() {
+  const { data, error } = await db.from('suggestions').select('*').order('created_at', { ascending: false });
+  if (!error && data) renderList(data);
+}
+
+async function submitName() {
+  const input = document.getElementById('nameInput');
+  const btn = document.getElementById('submitBtn');
+  const name = input.value.trim();
+  if (!name) { setStatus('please enter a name!', 'err'); return; }
+  btn.disabled = true;
+  setStatus('submitting...', 'loading');
+  const { error } = await db.from('suggestions').insert([{ name }]);
+  if (error) {
+    setStatus('error: ' + error.message, 'err');
+  } else {
+    setStatus('name submitted!', 'ok');
+    input.value = '';
+  }
+  btn.disabled = false;
+}
+
+document.getElementById('nameInput').addEventListener('keydown', e => {
+  if (e.key === 'Enter') submitName();
+});
+
+loadSuggestions();
+
+db.channel('suggestions-channel')
+  .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'suggestions' }, () => loadSuggestions())
+  .subscribe();
+</script>
